@@ -52,17 +52,27 @@ func (p *Publish) TopicName() string {
 }
 
 func (p *Publish) PacketIdentifier() uint16 {
-	return binary.BigEndian.Uint16(p.variableHeader()[2+p.topicNameBytes:])
+	if p.QoS() > QosAtMostOnce {
+		return binary.BigEndian.Uint16(p.variableHeader()[2+p.topicNameBytes:])
+	}
+
+	return 0
 }
 
 func (p *Publish) variableHeader() []byte {
 	fixedHeaderLen := 1 + p.remainingLengthBytes
-	variableHeaderLen := 2 + p.topicNameBytes + 2
+	variableHeaderLen := 2 + p.topicNameBytes
+	if p.QoS() > QosAtMostOnce {
+		variableHeaderLen += 2
+	}
 	return p.src[fixedHeaderLen : fixedHeaderLen+variableHeaderLen]
 }
 
 func (p *Publish) Payload() []byte {
 	fixedHeaderLen := 1 + p.remainingLengthBytes
-	variableHeaderLen := 2 + p.topicNameBytes + 2
+	variableHeaderLen := 2 + p.topicNameBytes
+	if p.QoS() > QosAtMostOnce {
+		variableHeaderLen += 2
+	}
 	return p.src[fixedHeaderLen+variableHeaderLen:]
 }

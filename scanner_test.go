@@ -1,23 +1,22 @@
 package mqpp_test
 
 import (
-	"bufio"
-	"fmt"
 	"testing"
+	// . "github.com/abo/mqpp"
 )
 
-import . "github.com/abo/mqpp"
-
 func TestScan(t *testing.T) {
-	scanner := bufio.NewScanner(nil)
+	// data := []byte{0x31, 0x0a, 0x00, 0x08, 0x54, 0x6f, 0x70, 0x69, 0x63, 0x41, 0x2f, 0x43, 0x31, 0x9, 0x0, 0x7, 0x54, 0x6f, 0x70, 0x69, 0x63, 0x2f, 0x43}
 
-	scanner.Split(ScanPackets)
-	for scanner.Scan() {
-		p, err := NewPacket(scanner.Bytes())
-		fmt.Println(p.Type())
-	}
+	// scanner := bufio.NewScanner(nil)
 
-	if err := scanner.Err(); err != nil {
-		fmt.Println(err)
-	}
+	// scanner.Split(ScanPackets)
+	// for scanner.Scan() {
+	// 	p, err := NewPacket(scanner.Bytes())
+	// 	fmt.Println(p.Type())
+	// }
+
+	// if err := scanner.Err(); err != nil {
+	// 	fmt.Println(err)
+	// }
 }
