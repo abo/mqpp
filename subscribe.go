@@ -25,6 +25,10 @@ func newSubscribe(data []byte) (*Subscribe, error) {
 		return nil, ErrMalformedRemLen
 	}
 	offset += remlenLen
+	packetLen := offset + int(remlen)
+	if len(data) < packetLen {
+		return nil, ErrProtocolViolation
+	}
 
 	offset += 2 // variable header
 
@@ -35,17 +39,19 @@ func newSubscribe(data []byte) (*Subscribe, error) {
 		filterLens = append(filterLens, filterLen)
 	}
 	return &Subscribe{
-		packetBytes:          data,
+		packetBytes:          data[0:packetLen],
 		remainingLengthBytes: remlenLen,
 		topicFiltersBytes:    filterLens,
 	}, nil
 }
 
+// PacketIdentifier return packet id
 func (s *Subscribe) PacketIdentifier() uint16 {
 	fixedHeaderLen := 1 + s.remainingLengthBytes
 	return binary.BigEndian.Uint16(s.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
 }
 
+// Payload return topicfilters and requested qoss
 func (s *Subscribe) Payload() []Subscription {
 	subs := make([]Subscription, len(s.topicFiltersBytes))
 	offset := 1 + s.remainingLengthBytes + 2

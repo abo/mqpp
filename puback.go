@@ -8,12 +8,13 @@ type Puback struct {
 }
 
 func newPuback(data []byte) (*Puback, error) {
-	if len(data) != 4 || data[0] != (PUBACK<<4) || data[1] != 2 {
+	if len(data) < 4 || data[0] != (PUBACK<<4) || data[1] != 2 {
 		return nil, ErrProtocolViolation
 	}
-	return &Puback{packetBytes: data}, nil
+	return &Puback{packetBytes: data[0:4]}, nil
 }
 
+// PacketIdentifier return packet id
 func (p *Puback) PacketIdentifier() uint16 {
 	return binary.BigEndian.Uint16(p.packetBytes[2:])
 }

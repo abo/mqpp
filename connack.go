@@ -8,11 +8,11 @@ type Connack struct {
 // newConnack create Connack from byte slice,
 func newConnack(data []byte) (*Connack, error) {
 	// check packet length, packet type, remaining length, conack flags, return code
-	if len(data) != 4 || data[0] != (CONNACK<<4) || data[1] != 2 || (data[2]>>1) != 0 || uint8(data[3]) > 5 {
+	if len(data) < 4 || data[0] != (CONNACK<<4) || data[1] != 2 || (data[2]>>1) != 0 || uint8(data[3]) > 5 {
 		return nil, ErrProtocolViolation
 	}
 
-	return &Connack{packetBytes: data}, nil
+	return &Connack{packetBytes: data[0:4]}, nil
 }
 
 // func NewConnack() *Connack {

@@ -9,26 +9,32 @@ type Suback struct {
 }
 
 func newSuback(data []byte) (*Suback, error) {
-	if data[0] != (SUBACK << 4) {
+	if len(data) < 1 || data[0] != (SUBACK<<4) {
 		return nil, ErrProtocolViolation
 	}
 	offset := 1
-	_, remlenLen := remainingLength(data[offset:])
+	remlen, remlenLen := remainingLength(data[offset:])
 	if remlenLen <= 0 {
 		return nil, ErrMalformedRemLen
 	}
+	packetLen := 1 + remlenLen + int(remlen)
+	if len(data) < packetLen {
+		return nil, ErrProtocolViolation
+	}
 
 	return &Suback{
-		packetBytes:          data,
+		packetBytes:          data[0:packetLen],
 		remainingLengthBytes: remlenLen,
 	}, nil
 }
 
+// PacketIdentifier return packet id
 func (p *Suback) PacketIdentifier() uint16 {
 	fixedHeaderLen := 1 + p.remainingLengthBytes
 	return binary.BigEndian.Uint16(p.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
 }
 
+// ReturnCodes return sub return codes
 func (p *Suback) ReturnCodes() []byte {
 	fixedHeaderLen := 1 + p.remainingLengthBytes
 	variableHeaderLen := 2

@@ -155,7 +155,8 @@ func splitPackets(data []byte, atEOF bool) (advance int, token []byte, err error
 		return 0, nil, nil
 	}
 
-	l, n := binary.Uvarint(data[1:])
+	l, n := remainingLength(data[1:])
+
 	if n == 0 {
 		if atEOF {
 			return 1, nil, ErrIncompletePacket
@@ -164,7 +165,7 @@ func splitPackets(data []byte, atEOF bool) (advance int, token []byte, err error
 		return 0, nil, nil
 	}
 
-	if l >= (1 << 28) {
+	if n < 0 {
 		return n, nil, ErrMalformedRemLen
 	}
 

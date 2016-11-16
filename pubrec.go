@@ -8,12 +8,13 @@ type Pubrec struct {
 }
 
 func newPubrec(data []byte) (*Pubrec, error) {
-	if len(data) != 4 || data[0] != (PUBREC<<4) || data[1] != 2 {
+	if len(data) < 4 || data[0] != (PUBREC<<4) || data[1] != 2 {
 		return nil, ErrProtocolViolation
 	}
-	return &Pubrec{packetBytes: data}, nil
+	return &Pubrec{packetBytes: data[0:4]}, nil
 }
 
+// PacketIdentifier return packet id
 func (p *Pubrec) PacketIdentifier() uint16 {
 	return binary.BigEndian.Uint16(p.packetBytes[2:])
 }

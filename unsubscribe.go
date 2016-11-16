@@ -19,6 +19,10 @@ func newUnsubscribe(data []byte) (*Unsubscribe, error) {
 		return nil, ErrMalformedRemLen
 	}
 	offset += remlenLen
+	packetLen := offset + int(remlen)
+	if len(data) < packetLen {
+		return nil, ErrProtocolViolation
+	}
 
 	offset += 2 //variable header
 
@@ -30,17 +34,19 @@ func newUnsubscribe(data []byte) (*Unsubscribe, error) {
 	}
 
 	return &Unsubscribe{
-		packetBytes:          data,
+		packetBytes:          data[0:packetLen],
 		remainingLengthBytes: remlenLen,
 		topicFiltersBytes:    filterLens,
 	}, nil
 }
 
+// PacketIdentifier return packet id
 func (u *Unsubscribe) PacketIdentifier() uint16 {
 	fixedHeaderLen := 1 + u.remainingLengthBytes
 	return binary.BigEndian.Uint16(u.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
 }
 
+// Payload return topic filters
 func (u *Unsubscribe) Payload() []string {
 	filters := make([]string, len(u.topicFiltersBytes))
 	offset := 1 + u.remainingLengthBytes + 2

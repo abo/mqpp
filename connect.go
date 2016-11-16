@@ -29,15 +29,20 @@ type Connect struct {
 }
 
 func newConnect(data []byte) (*Connect, error) {
-	if data[0] != (CONNECT << 4) {
+	if len(data) < 1 || data[0] != (CONNECT<<4) {
 		return nil, ErrProtocolViolation
 	}
 	offset := 1
-	_, remlenLen := remainingLength(data[offset:])
+	remlen, remlenLen := remainingLength(data[offset:])
 	if remlenLen <= 0 {
 		return nil, ErrMalformedRemLen
 	}
 	offset += remlenLen
+
+	packetLen := offset + int(remlen)
+	if len(data) < packetLen {
+		return nil, ErrProtocolViolation
+	}
 
 	pnameLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
 	offset += (2 + pnameLen)
@@ -75,7 +80,7 @@ func newConnect(data []byte) (*Connect, error) {
 	}
 
 	return &Connect{
-		packetBytes:          data,
+		packetBytes:          data[0:packetLen],
 		remainingLengthBytes: remlenLen,
 		protocolNameBytes:    pnameLen,
 		clientIDBytes:        cidLen,
@@ -114,50 +119,57 @@ func (c *Connect) payload() []byte {
 	return c.packetBytes[fixedHeaderLen+variableHeaderLen:]
 }
 
-// ProtocolName decode Protocol Name, 6 byte in variable header
-// A UTF-8 encoded string that represents the protocol name “MQTT”
-// according the specification
+// ProtocolName return protocol name, "MQTT" in 3.1.1
 func (c *Connect) ProtocolName() string {
 	return string(c.variableHeader()[2 : 2+c.protocolNameBytes])
 }
 
-// ProtocolLevel decode Protocol Level, 1 byte in variable header
+// ProtocolLevel return Protocol Level, 4 in 3.1.1
 func (c *Connect) ProtocolLevel() byte {
 	return c.variableHeader()[2+c.protocolNameBytes]
 }
 
+// UsernameFlag return is username present in the payload
 func (c *Connect) UsernameFlag() bool {
 	return bit(c.variableHeader()[2+c.protocolNameBytes+1], 7)
 }
 
+// PasswordFlag return is password present in the payload
 func (c *Connect) PasswordFlag() bool {
 	return bit(c.variableHeader()[2+c.protocolNameBytes+1], 6)
 }
 
+// WillRetain return is server should publish will message
 func (c *Connect) WillRetain() bool {
 	return bit(c.variableHeader()[2+c.protocolNameBytes+1], 5)
 }
 
+// WillQoS return the QoS level to be used when publishing the Will Message.
 func (c *Connect) WillQoS() byte {
 	return c.variableHeader()[2+c.protocolNameBytes+1] << 3 >> 6
 }
 
+// WillFlag return is will message present int the payload
 func (c *Connect) WillFlag() bool {
 	return bit(c.variableHeader()[2+c.protocolNameBytes+1], 2)
 }
 
+// CleanSession return is server should clean session when disconnect
 func (c *Connect) CleanSession() bool {
 	return bit(c.variableHeader()[2+c.protocolNameBytes+1], 1)
 }
 
+// KeepAlive return  maximum time interval between client packets transmitting
 func (c *Connect) KeepAlive() uint16 {
 	return binary.BigEndian.Uint16(c.variableHeader()[2+c.protocolNameBytes+1+1:])
 }
 
+// ClientIdentifier return client id
 func (c *Connect) ClientIdentifier() string {
 	return string(c.payload()[2 : 2+c.clientIDBytes])
 }
 
+// WillTopic return will topic if willflag is set, or "" when willflag not set
 func (c *Connect) WillTopic() string {
 	if !c.WillFlag() {
 		return ""
@@ -166,6 +178,7 @@ func (c *Connect) WillTopic() string {
 	return string(c.payload()[willTopicOffset : willTopicOffset+c.willTopicBytes])
 }
 
+// WillMessage return will message if willflag is set, or []byte{} when willflag not set
 func (c *Connect) WillMessage() []byte {
 	if c.WillFlag() {
 		return []byte{}
@@ -173,6 +186,8 @@ func (c *Connect) WillMessage() []byte {
 	willMsgOffset := 2 + c.clientIDBytes + 2 + c.willTopicBytes + 2
 	return c.payload()[willMsgOffset : willMsgOffset+c.willMessageBytes]
 }
+
+// Username return username when usernameFlag set, or "" when it not set
 func (c *Connect) Username() string {
 	if !c.UsernameFlag() {
 		return ""
@@ -185,6 +200,7 @@ func (c *Connect) Username() string {
 	return string(c.payload()[usernameOffset : usernameOffset+c.usernameBytes])
 }
 
+// Password return password when passwordFlag set, or []byte{} when it not set
 func (c *Connect) Password() []byte {
 	if !c.PasswordFlag() {
 		return []byte{}
