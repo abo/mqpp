@@ -4,12 +4,12 @@ import "encoding/binary"
 
 // Publish - publish message
 type Publish struct {
-	src                  []byte
+	packetBytes
 	remainingLengthBytes int
 	topicNameBytes       int
 }
 
-func NewPublish(data []byte) (*Publish, error) {
+func newPublish(data []byte) (*Publish, error) {
 	if data[0]>>4 != PUBLISH {
 		return nil, ErrProtocolViolation
 	}
@@ -25,26 +25,22 @@ func NewPublish(data []byte) (*Publish, error) {
 
 	// pid := int(binary.BigEndian.Uint16(data[offset : offset+2]))
 	return &Publish{
-		src:                  data,
+		packetBytes:          data,
 		remainingLengthBytes: remlenLen,
 		topicNameBytes:       topicLen,
 	}, nil
 }
 
-func (p *Publish) Length() uint32 { return uint32(len(p.src)) }
-
-func (p *Publish) Type() byte { return p.src[0] >> 4 }
-
 func (p *Publish) Dup() bool {
-	return bit(p.src[0], 3)
+	return bit(p.packetBytes[0], 3)
 }
 
 func (p *Publish) QoS() byte {
-	return p.src[0] << 5 >> 6
+	return p.packetBytes[0] << 5 >> 6
 }
 
 func (p *Publish) Retain() bool {
-	return bit(p.src[0], 0)
+	return bit(p.packetBytes[0], 0)
 }
 
 func (p *Publish) TopicName() string {
@@ -65,7 +61,7 @@ func (p *Publish) variableHeader() []byte {
 	if p.QoS() > QosAtMostOnce {
 		variableHeaderLen += 2
 	}
-	return p.src[fixedHeaderLen : fixedHeaderLen+variableHeaderLen]
+	return p.packetBytes[fixedHeaderLen : fixedHeaderLen+variableHeaderLen]
 }
 
 func (p *Publish) Payload() []byte {
@@ -74,5 +70,5 @@ func (p *Publish) Payload() []byte {
 	if p.QoS() > QosAtMostOnce {
 		variableHeaderLen += 2
 	}
-	return p.src[fixedHeaderLen+variableHeaderLen:]
+	return p.packetBytes[fixedHeaderLen+variableHeaderLen:]
 }

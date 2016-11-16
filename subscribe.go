@@ -4,7 +4,7 @@ import "encoding/binary"
 
 // Subscribe - subscribe to topics
 type Subscribe struct {
-	src                  []byte
+	packetBytes
 	remainingLengthBytes int
 	topicFiltersBytes    []int
 }
@@ -15,7 +15,7 @@ type Subscription struct {
 	RequestedQoS byte
 }
 
-func NewSubscribe(data []byte) (*Subscribe, error) {
+func newSubscribe(data []byte) (*Subscribe, error) {
 	if data[0] != (SUBSCRIBE<<4 | 0x02) {
 		return nil, ErrProtocolViolation
 	}
@@ -35,27 +35,23 @@ func NewSubscribe(data []byte) (*Subscribe, error) {
 		filterLens = append(filterLens, filterLen)
 	}
 	return &Subscribe{
-		src:                  data,
+		packetBytes:          data,
 		remainingLengthBytes: remlenLen,
 		topicFiltersBytes:    filterLens,
 	}, nil
 }
 
-func (s *Subscribe) Length() uint32 { return uint32(len(s.src)) }
-
-func (s *Subscribe) Type() byte { return s.src[0] >> 4 }
-
 func (s *Subscribe) PacketIdentifier() uint16 {
 	fixedHeaderLen := 1 + s.remainingLengthBytes
-	return binary.BigEndian.Uint16(s.src[fixedHeaderLen : fixedHeaderLen+2])
+	return binary.BigEndian.Uint16(s.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
 }
 
 func (s *Subscribe) Payload() []Subscription {
 	subs := make([]Subscription, len(s.topicFiltersBytes))
 	offset := 1 + s.remainingLengthBytes + 2
 	for i, l := range s.topicFiltersBytes {
-		filter := string(s.src[offset+2 : offset+2+l])
-		qos := s.src[offset+2+l]
+		filter := string(s.packetBytes[offset+2 : offset+2+l])
+		qos := s.packetBytes[offset+2+l]
 		subs[i] = Subscription{
 			TopicFilter:  filter,
 			RequestedQoS: qos,

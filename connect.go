@@ -4,7 +4,7 @@ import "encoding/binary"
 
 //Connect - client requests a connection to server
 type Connect struct {
-	src []byte
+	packetBytes
 
 	// 1 byte) packet type, reserved
 	// 1~4 bytes) remaining length
@@ -28,7 +28,7 @@ type Connect struct {
 	passwordBytes int
 }
 
-func NewConnect(data []byte) (*Connect, error) {
+func newConnect(data []byte) (*Connect, error) {
 	if data[0] != (CONNECT << 4) {
 		return nil, ErrProtocolViolation
 	}
@@ -40,21 +40,15 @@ func NewConnect(data []byte) (*Connect, error) {
 	offset += remlenLen
 
 	pnameLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
-	// if string(data[offset+2:offset+2+pnameLen]) != ProtocolName {
-	// 	return nil, errors.New("unacceptable protocol name")
-	// }
 	offset += (2 + pnameLen)
 
-	// plevel := data[offset]
-	// if plevel != ProtocolLevel {
-	// 	return nil, errors.New("unacceptable protocol level")
-	// }
+	// plevel
 	offset++
 
 	cflags := data[offset]
 	offset++
 
-	// keepalive := data[offset : offset+2]
+	// keepalive
 	offset += 2
 
 	cidLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
@@ -81,7 +75,7 @@ func NewConnect(data []byte) (*Connect, error) {
 	}
 
 	return &Connect{
-		src:                  data,
+		packetBytes:          data,
 		remainingLengthBytes: remlenLen,
 		protocolNameBytes:    pnameLen,
 		clientIDBytes:        cidLen,
@@ -96,7 +90,7 @@ func NewConnect(data []byte) (*Connect, error) {
 // Remaining Length (1~4 bytes)
 func (c *Connect) fixedHeader() []byte {
 	fixedHeaderLen := 1 + c.remainingLengthBytes
-	return c.src[0:fixedHeaderLen]
+	return c.packetBytes[0:fixedHeaderLen]
 }
 
 // Protocol Name (2 + n bytes)
@@ -106,7 +100,7 @@ func (c *Connect) fixedHeader() []byte {
 func (c *Connect) variableHeader() []byte {
 	fixedHeaderLen := 1 + c.remainingLengthBytes
 	variableHeaderLen := 2 + c.protocolNameBytes + 1 + 1 + 2
-	return c.src[fixedHeaderLen : fixedHeaderLen+variableHeaderLen]
+	return c.packetBytes[fixedHeaderLen : fixedHeaderLen+variableHeaderLen]
 }
 
 // Client Identifier (2 + n bytes)
@@ -117,15 +111,7 @@ func (c *Connect) variableHeader() []byte {
 func (c *Connect) payload() []byte {
 	fixedHeaderLen := 1 + c.remainingLengthBytes
 	variableHeaderLen := 2 + c.protocolNameBytes + 1 + 1 + 2
-	return c.src[fixedHeaderLen+variableHeaderLen:]
-}
-
-func (c *Connect) Type() byte {
-	return c.fixedHeader()[0] >> 4
-}
-
-func (c *Connect) Length() uint32 {
-	return uint32(len(c.src))
+	return c.packetBytes[fixedHeaderLen+variableHeaderLen:]
 }
 
 // ProtocolName decode Protocol Name, 6 byte in variable header

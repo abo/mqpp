@@ -4,11 +4,11 @@ import "encoding/binary"
 
 // Suback - subscribe acknowledgement
 type Suback struct {
-	src                  []byte
+	packetBytes
 	remainingLengthBytes int
 }
 
-func NewSuback(data []byte) (*Suback, error) {
+func newSuback(data []byte) (*Suback, error) {
 	if data[0] != (SUBACK << 4) {
 		return nil, ErrProtocolViolation
 	}
@@ -19,22 +19,18 @@ func NewSuback(data []byte) (*Suback, error) {
 	}
 
 	return &Suback{
-		src:                  data,
+		packetBytes:          data,
 		remainingLengthBytes: remlenLen,
 	}, nil
 }
 
-func (p *Suback) Length() uint32 { return uint32(len(p.src)) }
-
-func (p *Suback) Type() byte { return p.src[0] >> 4 }
-
 func (p *Suback) PacketIdentifier() uint16 {
 	fixedHeaderLen := 1 + p.remainingLengthBytes
-	return binary.BigEndian.Uint16(p.src[fixedHeaderLen : fixedHeaderLen+2])
+	return binary.BigEndian.Uint16(p.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
 }
 
 func (p *Suback) ReturnCodes() []byte {
 	fixedHeaderLen := 1 + p.remainingLengthBytes
 	variableHeaderLen := 2
-	return p.src[fixedHeaderLen+variableHeaderLen:]
+	return p.packetBytes[fixedHeaderLen+variableHeaderLen:]
 }

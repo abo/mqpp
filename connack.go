@@ -2,17 +2,17 @@ package mqpp
 
 // Connack - acknowledge connection request
 type Connack struct {
-	src []byte
+	packetBytes
 }
 
-// NewConnack create Connack from byte slice,
-func NewConnack(data []byte) (*Connack, error) {
+// newConnack create Connack from byte slice,
+func newConnack(data []byte) (*Connack, error) {
 	// check packet length, packet type, remaining length, conack flags, return code
 	if len(data) != 4 || data[0] != (CONNACK<<4) || data[1] != 2 || (data[2]>>1) != 0 || uint8(data[3]) > 5 {
 		return nil, ErrProtocolViolation
 	}
 
-	return &Connack{src: data}, nil
+	return &Connack{packetBytes: data}, nil
 }
 
 // func NewConnack() *Connack {
@@ -21,31 +21,24 @@ func NewConnack(data []byte) (*Connack, error) {
 // 	}
 // }
 
-func (p *Connack) Type() byte {
-	return p.src[0] >> 4
-}
-
-func (p *Connack) Length() uint32 {
-	return uint32(len(p.src))
-}
-
 func (p *Connack) SetSessionPresent(present bool) {
 	if present {
-		p.src[2] = 0x01
+		p.packetBytes[2] = 0x01
 	} else {
-		p.src[2] = 0x00
+		p.packetBytes[2] = 0x00
 	}
 }
 
+// SessionPresent return is session present
 func (p *Connack) SessionPresent() bool {
-	return p.src[2]&0x01 == 0x01
+	return p.packetBytes[2]&0x01 == 0x01
 }
 
 func (p *Connack) SetReturnCode(code byte) {
-	p.src[3] = code
+	p.packetBytes[3] = code
 }
 
-// ReturnCode
+// ReturnCode return connect return code
 func (p *Connack) ReturnCode() byte {
-	return p.src[3]
+	return p.packetBytes[3]
 }
