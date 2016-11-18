@@ -14,7 +14,7 @@ func newPublish(data []byte) (*Publish, error) {
 		return nil, ErrProtocolViolation
 	}
 	offset := 1
-	remlen, remlenLen := remainingLength(data[offset:])
+	remlen, remlenLen := decRemLen(data[offset:])
 	if remlenLen <= 0 {
 		return nil, ErrMalformedRemLen
 	}
@@ -34,6 +34,23 @@ func newPublish(data []byte) (*Publish, error) {
 		remainingLengthBytes: remlenLen,
 		topicNameBytes:       topicLen,
 	}, nil
+}
+
+// MakePublish create a mqtt publish packet
+func MakePublish(dup bool, qos byte, retain bool, topicName string, packetIdentifier uint16, payload []byte) Publish {
+	topicLen := len(topicName)
+	remlen := (2 + topicLen) + 2 + len(payload)
+	remlenLen := lenRemLen(uint32(remlen))
+
+	pb := make([]byte, 1+remlenLen+remlen)
+	offset := fill(pb, (PUBLISH<<4)|set(3, dup)|(qos<<1)|set(0, retain))
+	offset += fill(pb[offset:], uint32(remlen), topicName, packetIdentifier, payload)
+
+	return Publish{
+		packetBytes:          pb,
+		remainingLengthBytes: remlenLen,
+		topicNameBytes:       topicLen,
+	}
 }
 
 // Dup return is dup

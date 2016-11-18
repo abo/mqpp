@@ -2,7 +2,7 @@ package mqpp
 
 import "encoding/binary"
 
-//Puback - publish acknowledgement
+// Puback - publish acknowledgement
 type Puback struct {
 	packetBytes
 }
@@ -12,6 +12,13 @@ func newPuback(data []byte) (*Puback, error) {
 		return nil, ErrProtocolViolation
 	}
 	return &Puback{packetBytes: data[0:4]}, nil
+}
+
+// MakePuback create a mqtt puback Packet
+func MakePuback(packetIdentifier uint16) Puback {
+	pb := make([]byte, 4)
+	fill(pb, PUBACK<<4, uint32(2), packetIdentifier)
+	return Puback{packetBytes: pb}
 }
 
 // PacketIdentifier return packet id

@@ -20,7 +20,7 @@ func newSubscribe(data []byte) (*Subscribe, error) {
 		return nil, ErrProtocolViolation
 	}
 	offset := 1
-	remlen, remlenLen := remainingLength(data[offset:])
+	remlen, remlenLen := decRemLen(data[offset:])
 	if remlenLen <= 0 {
 		return nil, ErrMalformedRemLen
 	}
@@ -43,6 +43,28 @@ func newSubscribe(data []byte) (*Subscribe, error) {
 		remainingLengthBytes: remlenLen,
 		topicFiltersBytes:    filterLens,
 	}, nil
+}
+
+// MakeSubscribe create a mqtt subscribe packet
+func MakeSubscribe(packetIdentifier uint16, payload []Subscription) Subscribe {
+	remlen := 0
+	remlen += 2
+	filterLens := []int{}
+	for _, s := range payload {
+		filterLens = append(filterLens, len(s.TopicFilter))
+		remlen += (2 + len(s.TopicFilter) + 1)
+	}
+
+	pb := make([]byte, 1+lenRemLen(uint32(remlen))+remlen)
+	offset := fill(pb, (SUBSCRIBE<<4 | 0x02), remlen, packetIdentifier)
+	for _, s := range payload {
+		offset += fill(pb[offset:], s.TopicFilter, s.RequestedQoS)
+	}
+	return Subscribe{
+		packetBytes:          pb,
+		remainingLengthBytes: lenRemLen(uint32(remlen)),
+		topicFiltersBytes:    filterLens,
+	}
 }
 
 // PacketIdentifier return packet id

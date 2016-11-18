@@ -14,6 +14,13 @@ func newPubrel(data []byte) (*Pubrel, error) {
 	return &Pubrel{packetBytes: data[0:4]}, nil
 }
 
+// MakePubrel create a mqtt pubrel packet
+func MakePubrel(packetIdentifier uint16) Pubrel {
+	pb := make([]byte, 4)
+	fill(pb, PUBREL<<4|0x02, uint32(2), packetIdentifier)
+	return Pubrel{packetBytes: pb}
+}
+
 // PacketIdentifier return packet id
 func (p *Pubrel) PacketIdentifier() uint16 {
 	return binary.BigEndian.Uint16(p.packetBytes[2:])

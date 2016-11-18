@@ -11,3 +11,10 @@ func newPingresp(data []byte) (*Pingresp, error) {
 	}
 	return &Pingresp{packetBytes: data[0:2]}, nil
 }
+
+// MakePingresp create a mqtt pingresp packet
+func MakePingresp() Pingresp {
+	pb := make([]byte, 2)
+	fill(pb, PINGRESP<<4, uint32(0))
+	return Pingresp{packetBytes: pb}
+}

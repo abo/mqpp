@@ -33,7 +33,7 @@ func newConnect(data []byte) (*Connect, error) {
 		return nil, ErrProtocolViolation
 	}
 	offset := 1
-	remlen, remlenLen := remainingLength(data[offset:])
+	remlen, remlenLen := decRemLen(data[offset:])
 	if remlenLen <= 0 {
 		return nil, ErrMalformedRemLen
 	}
@@ -89,6 +89,55 @@ func newConnect(data []byte) (*Connect, error) {
 		usernameBytes:        unameLen,
 		passwordBytes:        pwdLen,
 	}, nil
+}
+
+// MakeConnect create a mqtt connect packet with fields
+func MakeConnect(protocolName string, protocolLevel byte, willRetain bool, willQoS byte, cleanSession bool, keepAlive uint16, clientIdentifier string, willTopic string, willMessage []byte, username string, password []byte) Connect {
+	remlen := 0
+	remlen += (2 + len(protocolName))
+	remlen++
+	remlen++
+	remlen += 2
+	remlen += (2 + len(clientIdentifier))
+
+	willFlag := len(willTopic) > 0
+	if willFlag {
+		remlen += (2 + len(willTopic))
+		remlen += (2 + len(willMessage))
+	}
+	usernameFlag := len(username) > 0
+	if usernameFlag {
+		remlen += (2 + len(username))
+	}
+	passwordFlag := len(password) > 0
+	if passwordFlag {
+		remlen += (2 + len(password))
+	}
+	pb := make([]byte, 1+lenRemLen(uint32(remlen))+remlen)
+	offset := fill(pb, CONNECT<<4, uint32(remlen), protocolName, protocolLevel)
+	offset += fill(pb[offset:], set(7, usernameFlag)|set(6, passwordFlag)|set(5, willRetain)|willQoS<<3|set(2, willFlag)|set(1, cleanSession))
+	offset += fill(pb[offset:], keepAlive)
+	offset += fill(pb[offset:], clientIdentifier)
+	if willFlag {
+		offset += fill(pb[offset:], willTopic, string(willMessage))
+	}
+	if usernameFlag {
+		offset += fill(pb[offset:], username)
+	}
+	if passwordFlag {
+		offset += fill(pb[offset:], string(password))
+	}
+
+	return Connect{
+		packetBytes:          pb,
+		remainingLengthBytes: lenRemLen(uint32(remlen)),
+		protocolNameBytes:    len(protocolName),
+		clientIDBytes:        len(clientIdentifier),
+		willTopicBytes:       len(willTopic),
+		willMessageBytes:     len(willMessage),
+		usernameBytes:        len(username),
+		passwordBytes:        len(password),
+	}
 }
 
 // Packet Type + Reserved (1 byte)

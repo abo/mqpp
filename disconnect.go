@@ -13,8 +13,9 @@ func newDisconnect(data []byte) (*Disconnect, error) {
 	return &Disconnect{packetBytes: data[0:2]}, nil
 }
 
-// func NewDisconnect() *Disconnect {
-// 	return &Disconnect{
-// 		src: []byte{DISCONNECT << 4, 0x00},
-// 	}
-// }
+// MakeDisconnect create a mqtt disconnect packet
+func MakeDisconnect() Disconnect {
+	pb := make([]byte, 2)
+	fill(pb, DISCONNECT<<4, uint32(0))
+	return Disconnect{packetBytes: pb}
+}

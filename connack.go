@@ -15,27 +15,16 @@ func newConnack(data []byte) (*Connack, error) {
 	return &Connack{packetBytes: data[0:4]}, nil
 }
 
-// func NewConnack() *Connack {
-// 	return &Connack{
-// 		src: []byte{CONNACK << 4, byte(2), 0x00, 0x00},
-// 	}
-// }
-
-func (p *Connack) SetSessionPresent(present bool) {
-	if present {
-		p.packetBytes[2] = 0x01
-	} else {
-		p.packetBytes[2] = 0x00
-	}
+// MakeConnack return a mqtt connack packet with SessionPresent and ReturnCode
+func MakeConnack(sessionPresent bool, returnCode byte) Connack {
+	pb := make([]byte, 4)
+	fill(pb, CONNACK<<4, uint32(2), set(0, sessionPresent), returnCode)
+	return Connack{packetBytes: pb}
 }
 
 // SessionPresent return is session present
 func (p *Connack) SessionPresent() bool {
 	return p.packetBytes[2]&0x01 == 0x01
-}
-
-func (p *Connack) SetReturnCode(code byte) {
-	p.packetBytes[3] = code
 }
 
 // ReturnCode return connect return code

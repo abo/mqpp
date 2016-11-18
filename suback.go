@@ -13,7 +13,7 @@ func newSuback(data []byte) (*Suback, error) {
 		return nil, ErrProtocolViolation
 	}
 	offset := 1
-	remlen, remlenLen := remainingLength(data[offset:])
+	remlen, remlenLen := decRemLen(data[offset:])
 	if remlenLen <= 0 {
 		return nil, ErrMalformedRemLen
 	}
@@ -26,6 +26,20 @@ func newSuback(data []byte) (*Suback, error) {
 		packetBytes:          data[0:packetLen],
 		remainingLengthBytes: remlenLen,
 	}, nil
+}
+
+// MakeSuback create a mqtt suback packet
+func MakeSuback(packetIdentifier uint16, returnCodes []byte) Suback {
+	remlen := 2 + len(returnCodes)
+	remlenLen := lenRemLen(uint32(remlen))
+	pb := make([]byte, 1+remlenLen+remlen)
+
+	fill(pb, SUBACK<<4, uint32(remlen), packetIdentifier, returnCodes)
+
+	return Suback{
+		packetBytes:          pb,
+		remainingLengthBytes: remlenLen,
+	}
 }
 
 // PacketIdentifier return packet id

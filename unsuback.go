@@ -14,6 +14,13 @@ func newUnsuback(data []byte) (*Unsuback, error) {
 	return &Unsuback{packetBytes: data[0:4]}, nil
 }
 
+// MakeUnsuback create a mqtt unsuback packet
+func MakeUnsuback(packetIdentifier uint16) Unsuback {
+	pb := make([]byte, 4)
+	fill(pb, UNSUBACK<<4, byte(2), packetIdentifier)
+	return Unsuback{packetBytes: pb}
+}
+
 // PacketIdentifier return packet id
 func (s *Unsuback) PacketIdentifier() uint16 {
 	return binary.BigEndian.Uint16(s.packetBytes[2:])

@@ -155,7 +155,7 @@ func splitPackets(data []byte, atEOF bool) (advance int, token []byte, err error
 		return 0, nil, nil
 	}
 
-	l, n := remainingLength(data[1:])
+	l, n := decRemLen(data[1:])
 
 	if n == 0 {
 		if atEOF {
@@ -184,6 +184,42 @@ func bit(b byte, n uint8) bool {
 	return b&(1<<n) != 0
 }
 
+func set(n uint8, v bool) byte {
+	if v {
+		return byte(1) << n
+	}
+	return byte(0)
+}
+
+// fill byte array, return how many bytes writen
+// if n < 0, meanings unsupport type, -n bytes writen
+func fill(bs []byte, vals ...interface{}) int {
+	offset := 0
+	for _, val := range vals {
+		switch val.(type) {
+		case byte:
+			bs[offset] = val.(byte)
+			offset++
+		case uint16:
+			binary.BigEndian.PutUint16(bs[offset:], val.(uint16))
+			offset += 2
+		case uint32: // remaingLength
+			n := binary.PutUvarint(bs[offset:], uint64(val.(uint32)))
+			offset += n
+		case string:
+			str := val.(string)
+			binary.BigEndian.PutUint16(bs[offset:], uint16(len(str)))
+			offset += 2
+			offset += copy(bs[offset:], str)
+		case []byte:
+			offset += copy(bs[offset:], val.([]byte))
+		default: // unknown type
+			return -offset
+		}
+	}
+	return offset
+}
+
 // decode remaining length, and returns that value and the
 // number of bytes read (> 0). If an error occurred, the value is 0
 // and the number of bytes n is <= 0 meaning:
@@ -192,11 +228,25 @@ func bit(b byte, n uint8) bool {
 //	n  < 0: value larger than 268,435,455 (overflow)
 //              and -n is the number of bytes read
 //
-func remainingLength(data []byte) (uint32, int) {
+func decRemLen(data []byte) (uint32, int) {
 	val, n := binary.Uvarint(data)
-	if n > 0 && val >= (1<<28) {
+	if n > 0 && val > 268435455 {
 		return 0, -n
 	}
 
 	return uint32(val), n
+}
+
+// how many bytes for encoding remlen
+func lenRemLen(remlen uint32) int {
+	if remlen <= 127 {
+		return 1
+	} else if remlen <= 16383 {
+		return 2
+	} else if remlen <= 2097151 {
+		return 3
+	} else if remlen <= 268435455 {
+		return 4
+	}
+	return 0
 }
