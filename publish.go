@@ -44,7 +44,11 @@ func MakePublish(dup bool, qos byte, retain bool, topicName string, packetIdenti
 
 	pb := make([]byte, 1+remlenLen+remlen)
 	offset := fill(pb, (PUBLISH<<4)|set(3, dup)|(qos<<1)|set(0, retain))
-	offset += fill(pb[offset:], uint32(remlen), topicName, packetIdentifier, payload)
+	offset += fill(pb[offset:], uint32(remlen), topicName)
+	if qos > QosAtMostOnce {
+		offset += fill(pb[offset:], packetIdentifier)
+	}
+	offset += fill(pb[offset:], payload)
 
 	return Publish{
 		packetBytes:          pb,

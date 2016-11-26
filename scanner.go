@@ -40,6 +40,9 @@ const (
 	QosExactlyOnce
 )
 
+// SubackFailure suback return code - failed
+const SubackFailure = 0x80
+
 // Connect Return Code
 const (
 	Accepted byte = iota
@@ -94,6 +97,8 @@ var (
 	ErrIncompletePacket = errors.New("mqpp: Incomplete Packet")
 	// ErrProtocolViolation - protocol violation according MQTT specification
 	ErrProtocolViolation = errors.New("mqpp: Protocol Violation")
+	// ErrReservedPacketType - unknown packet type
+	ErrReservedPacketType = errors.New("mqpp: Reserved Packet Type")
 )
 
 // Scanner wrap bufio.Scanner with SplitFunc which scanning a file into mqtt packets
@@ -134,8 +139,19 @@ func (s *Scanner) Packet() (ControlPacket, error) {
 	case DISCONNECT:
 		return newDisconnect(data)
 	default:
-		return nil, errors.New("Reserved Packet Type")
+		return nil, ErrReservedPacketType
 	}
+}
+
+// NextPacket advances the Scanner to the next packet, and return it.
+// it return any error that
+// occurred during scanning and parsing, except that if it was io.EOF, Err
+// will return nil.
+func (s *Scanner) NextPacket() (ControlPacket, error) {
+	if !s.Scan() {
+		return nil, s.Err()
+	}
+	return s.Packet()
 }
 
 // NewScanner returns a new Scanner to read from r, with The split function splitPackets.

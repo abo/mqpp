@@ -22,9 +22,19 @@ func MakeConnack(sessionPresent bool, returnCode byte) Connack {
 	return Connack{packetBytes: pb}
 }
 
+// SetSessionPresent set is session present
+func (p *Connack) SetSessionPresent(sessionPresent bool) {
+	p.packetBytes[2] = set(0, sessionPresent)
+}
+
 // SessionPresent return is session present
 func (p *Connack) SessionPresent() bool {
 	return p.packetBytes[2]&0x01 == 0x01
+}
+
+// SetReturnCode set return code
+func (p *Connack) SetReturnCode(returnCode byte) {
+	p.packetBytes[3] = returnCode
 }
 
 // ReturnCode return connect return code
