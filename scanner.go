@@ -1,3 +1,17 @@
+// Copyright (c) 2016 The MQPP Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package mqpp
 
 import (
@@ -10,8 +24,8 @@ import (
 
 // MQTT Protocol Name and Level
 const (
-	ProtocolName  = "MQTT"
-	ProtocolLevel = 4
+	ProtocolName  string = "MQTT"
+	ProtocolLevel byte   = 4
 )
 
 // MQTT Control Packet types
@@ -41,7 +55,7 @@ const (
 )
 
 // SubackFailure suback return code - failed
-const SubackFailure = 0x80
+const SubackFailure byte = 0x80
 
 // Connect Return Code
 const (
@@ -67,6 +81,7 @@ var ConnectReturnCodeResponses = map[byte]string{
 type ControlPacket interface {
 	Type() byte
 	Length() uint32
+	Bytes() []byte
 	io.WriterTo
 }
 
@@ -87,6 +102,10 @@ func (pbs packetBytes) Type() byte {
 func (pbs packetBytes) WriteTo(w io.Writer) (int64, error) {
 	n, err := w.Write(pbs)
 	return int64(n), err
+}
+
+func (pbs packetBytes) Bytes() []byte {
+	return []byte(pbs)
 }
 
 var (
