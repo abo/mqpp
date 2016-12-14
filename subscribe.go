@@ -14,16 +14,14 @@
 
 package mqpp
 
-import "encoding/binary"
-
 // Subscribe mqtt subscribe to topics, sturcture:
 // fixed header:
 // variable header: Packet Identifier
 // payload: (Topic Filter, Requested QoS)s
 type Subscribe struct {
-	packetBytes
-	remainingLengthBytes int
-	topicFiltersBytes    []int
+	endecBytes
+	packetIDPos     int
+	topicFilterPoss []int
 }
 
 // Subscription - topic filter and requested qos
@@ -33,75 +31,67 @@ type Subscription struct {
 }
 
 func newSubscribe(data []byte) (*Subscribe, error) {
-	if data[0] != (SUBSCRIBE<<4 | 0x02) {
+	if data[0] != (TSUBSCRIBE<<4 | 0x02) {
 		return nil, ErrProtocolViolation
 	}
-	offset := 1
-	remlen, remlenLen := decRemLen(data[offset:])
-	if remlenLen <= 0 {
+
+	p := &Subscribe{endecBytes: data}
+	remlen, offset := p.remlen(1)
+	if offset <= 1 {
 		return nil, ErrMalformedRemLen
 	}
-	offset += remlenLen
-	packetLen := offset + int(remlen)
-	if len(data) < packetLen {
+	pktLen := offset + int(remlen)
+	if len(data) < pktLen {
 		return nil, ErrProtocolViolation
 	}
-
-	offset += 2 // variable header
-
-	filterLens := []int{}
-	for offset < 1+remlenLen+int(remlen) {
-		filterLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
-		offset += (2 + filterLen + 1)
-		filterLens = append(filterLens, filterLen)
+	p.packetIDPos = offset
+	_, offset = p.uint16(p.packetIDPos)
+	p.topicFilterPoss = []int{}
+	for offset < pktLen {
+		p.topicFilterPoss = append(p.topicFilterPoss, offset)
+		_, offset = p.string(offset)
+		_, offset = p.byte(offset)
 	}
-	return &Subscribe{
-		packetBytes:          data[0:packetLen],
-		remainingLengthBytes: remlenLen,
-		topicFiltersBytes:    filterLens,
-	}, nil
+
+	return p, nil
 }
 
 // MakeSubscribe create a mqtt subscribe packet
 func MakeSubscribe(packetIdentifier uint16, payload []Subscription) Subscribe {
-	remlen := 0
-	remlen += 2
-	filterLens := []int{}
+	p := Subscribe{}
+	remlen := p.calc(packetIdentifier)
 	for _, s := range payload {
-		filterLens = append(filterLens, len(s.TopicFilter))
-		remlen += (2 + len([]byte(s.TopicFilter)) + 1)
+		remlen += p.calc(s.TopicFilter, s.RequestedQoS)
 	}
+	pktLen := 1 + p.calc(uint32(remlen)) + remlen
 
-	pb := make([]byte, 1+lenRemLen(uint32(remlen))+remlen)
-	offset := fill(pb, (SUBSCRIBE<<4 | 0x02), uint32(remlen), packetIdentifier)
-	for _, s := range payload {
-		offset += fill(pb[offset:], s.TopicFilter, s.RequestedQoS)
+	p.endecBytes = make([]byte, pktLen)
+	p.packetIDPos = p.fill(0, (TSUBSCRIBE<<4 | 0x02), uint32(remlen))
+	offset := p.fill(p.packetIDPos, packetIdentifier)
+	p.topicFilterPoss = make([]int, len(payload))
+	for i, s := range payload {
+		p.topicFilterPoss[i] = offset
+		offset = p.fill(offset, s.TopicFilter, s.RequestedQoS)
 	}
-	return Subscribe{
-		packetBytes:          pb,
-		remainingLengthBytes: lenRemLen(uint32(remlen)),
-		topicFiltersBytes:    filterLens,
-	}
+	return p
 }
 
 // PacketIdentifier return packet id
 func (s *Subscribe) PacketIdentifier() uint16 {
-	fixedHeaderLen := 1 + s.remainingLengthBytes
-	return binary.BigEndian.Uint16(s.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
+	pid, _ := s.uint16(s.packetIDPos)
+	return pid
 }
 
 // Payload return topicfilters and requested qoss
 func (s *Subscribe) Payload() []Subscription {
-	subs := make([]Subscription, len(s.topicFiltersBytes))
-	offset := 1 + s.remainingLengthBytes + 2
-	for i, l := range s.topicFiltersBytes {
-		filter := string(s.packetBytes[offset+2 : offset+2+l])
-		qos := s.packetBytes[offset+2+l]
+	subs := make([]Subscription, len(s.topicFilterPoss))
+	for i, offset := range s.topicFilterPoss {
+		filter, pos := s.string(offset)
+		qos, _ := s.byte(pos)
 		subs[i] = Subscription{
 			TopicFilter:  filter,
 			RequestedQoS: qos,
 		}
-		offset += (2 + l + 1)
 	}
 	return subs
 }

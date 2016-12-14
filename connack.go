@@ -18,38 +18,45 @@ package mqpp
 // fixed header
 // variable header: Connect Acknowledge Flags(1 byte) + Connect Return code(1 byte)
 type Connack struct {
-	packetBytes
+	endecBytes
 }
 
 // newConnack parse Connack from byte slice
 func newConnack(data []byte) (*Connack, error) {
 	// check packet length, packet type, remaining length, conack flags, return code
-	if len(data) < 4 || data[0] != (CONNACK<<4) || data[1] != 2 || (data[2]>>1) != 0 || uint8(data[3]) > 5 {
+	if len(data) < 4 || data[0] != (TCONNACK<<4) || data[1] != 2 || (data[2]>>1) != 0 || uint8(data[3]) > 5 {
 		return nil, ErrProtocolViolation
 	}
 
-	return &Connack{packetBytes: data[0:4]}, nil
+	return &Connack{endecBytes: data[0:4]}, nil
 }
 
 // MakeConnack create a mqtt connack packet with SessionPresent and ReturnCode
 func MakeConnack(sessionPresent bool, returnCode byte) Connack {
-	pb := make([]byte, 4)
-	fill(pb, CONNACK<<4, uint32(2), set(0, sessionPresent), returnCode)
-	return Connack{packetBytes: pb}
+	p := Connack{endecBytes: make([]byte, 4)}
+	offset := p.fill(0, TCONNACK<<4, uint32(2))
+	p.set(offset, 0, sessionPresent)
+	p.fill(offset+1, returnCode)
+	return p
 }
 
+// SetSessionPresent set is the session present or not
 func (p *Connack) SetSessionPresent(sessionPresent bool) {
-	p.packetBytes[2] = set(0, sessionPresent)
+	p.set(2, 0, sessionPresent)
 }
 
+// SessionPresent returns is the session present or not
 func (p *Connack) SessionPresent() bool {
-	return p.packetBytes[2]&0x01 == 0x01
+	return p.bit(2, 0)
 }
 
+// SetReturnCode set the return code
 func (p *Connack) SetReturnCode(returnCode byte) {
-	p.packetBytes[3] = returnCode
+	p.fill(3, returnCode)
 }
 
+// ReturnCode return the return code
 func (p *Connack) ReturnCode() byte {
-	return p.packetBytes[3]
+	code, _ := p.byte(3)
+	return code
 }

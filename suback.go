@@ -14,60 +14,53 @@
 
 package mqpp
 
-import "encoding/binary"
-
 // Suback mqtt subscribe acknowledgement, structure:
 // fixed header:
 // variable header: Packet Identifier
 // payload: Return Codes
 type Suback struct {
-	packetBytes
-	remainingLengthBytes int
+	endecBytes
+	packetIDPos int
 }
 
 func newSuback(data []byte) (*Suback, error) {
-	if len(data) < 1 || data[0] != (SUBACK<<4) {
-		return nil, ErrProtocolViolation
-	}
-	offset := 1
-	remlen, remlenLen := decRemLen(data[offset:])
-	if remlenLen <= 0 {
-		return nil, ErrMalformedRemLen
-	}
-	packetLen := 1 + remlenLen + int(remlen)
-	if len(data) < packetLen {
+	if len(data) < 1 || data[0] != (TSUBACK<<4) {
 		return nil, ErrProtocolViolation
 	}
 
-	return &Suback{
-		packetBytes:          data[0:packetLen],
-		remainingLengthBytes: remlenLen,
-	}, nil
+	p := &Suback{endecBytes: data}
+	remlen, offset := p.remlen(1)
+	if offset <= 1 {
+		return nil, ErrMalformedRemLen
+	}
+	pktLen := offset + int(remlen)
+	if len(data) < pktLen {
+		return nil, ErrProtocolViolation
+	}
+	p.packetIDPos = offset
+	return p, nil
 }
 
 // MakeSuback create a mqtt suback packet
 func MakeSuback(packetIdentifier uint16, returnCodes []byte) Suback {
-	remlen := 2 + len(returnCodes)
-	remlenLen := lenRemLen(uint32(remlen))
-	pb := make([]byte, 1+remlenLen+remlen)
+	p := Suback{}
+	remlen := p.calc(packetIdentifier, returnCodes)
+	pktLen := 1 + p.calc(uint32(remlen)) + remlen
+	p.endecBytes = make([]byte, pktLen)
+	p.packetIDPos = p.fill(0, TSUBACK<<4, uint32(remlen))
+	p.fill(p.packetIDPos, packetIdentifier, returnCodes)
 
-	fill(pb, SUBACK<<4, uint32(remlen), packetIdentifier, returnCodes)
-
-	return Suback{
-		packetBytes:          pb,
-		remainingLengthBytes: remlenLen,
-	}
+	return p
 }
 
 // PacketIdentifier return packet id
 func (p *Suback) PacketIdentifier() uint16 {
-	fixedHeaderLen := 1 + p.remainingLengthBytes
-	return binary.BigEndian.Uint16(p.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
+	pid, _ := p.uint16(p.packetIDPos)
+	return pid
 }
 
 // ReturnCodes return sub return codes
 func (p *Suback) ReturnCodes() []byte {
-	fixedHeaderLen := 1 + p.remainingLengthBytes
-	variableHeaderLen := 2
-	return p.packetBytes[fixedHeaderLen+variableHeaderLen:]
+	_, offset := p.uint16(p.packetIDPos)
+	return p.bytes(offset)
 }

@@ -45,12 +45,12 @@ func TestScan(t *testing.T) {
 	// data := []byte{0x31, 0x0a, 0x00, 0x08, 0x54, 0x6f, 0x70, 0x69, 0x63, 0x41, 0x2f, 0x43, 0x31, 0x09, 0x00, 0x07, 0x54, 0x6f, 0x70, 0x69, 0x63, 0x2f, 0x43}
 	data := buf.Bytes()
 	r := bytes.NewReader(data)
-	s := NewScanner(r)
+	s := NewSplitter(r)
 
-	for _, origin := range pkts {
+	for i, origin := range pkts {
 		p, err := s.NextPacket()
 		if err != nil || 0 != bytes.Compare(origin.Bytes(), p.Bytes()) {
-			t.Fatalf("expect %v, actual %v", origin, p)
+			t.Fatalf("no.%d : expect %v, actual %v, with err:%v", i, origin, p, err)
 		}
 	}
 	p, err := s.NextPacket()

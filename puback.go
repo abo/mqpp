@@ -14,30 +14,29 @@
 
 package mqpp
 
-import "encoding/binary"
-
 // Puback mqtt publish acknowledgement, structure:
 // fixed header
 // variable header: Packet Identifier
 type Puback struct {
-	packetBytes
+	endecBytes
 }
 
 func newPuback(data []byte) (*Puback, error) {
-	if len(data) < 4 || data[0] != (PUBACK<<4) || data[1] != 2 {
+	if len(data) < 4 || data[0] != (TPUBACK<<4) || data[1] != 2 {
 		return nil, ErrProtocolViolation
 	}
-	return &Puback{packetBytes: data[0:4]}, nil
+	return &Puback{endecBytes: data[0:4]}, nil
 }
 
 // MakePuback create a mqtt puback Packet
 func MakePuback(packetIdentifier uint16) Puback {
-	pb := make([]byte, 4)
-	fill(pb, PUBACK<<4, uint32(2), packetIdentifier)
-	return Puback{packetBytes: pb}
+	p := Puback{endecBytes: make([]byte, 4)}
+	p.fill(0, TPUBACK<<4, uint32(2), packetIdentifier)
+	return p
 }
 
 // PacketIdentifier return packet id
 func (p *Puback) PacketIdentifier() uint16 {
-	return binary.BigEndian.Uint16(p.packetBytes[2:])
+	pid, _ := p.uint16(2)
+	return pid
 }

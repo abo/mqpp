@@ -17,19 +17,19 @@ package mqpp
 // Pingreq mqtt ping request, structure:
 // fixed header
 type Pingreq struct {
-	packetBytes
+	endecBytes
 }
 
 func newPingreq(data []byte) (*Pingreq, error) {
-	if len(data) < 2 || data[0] != (PINGREQ<<4) || data[1] != 0 {
+	if len(data) < 2 || data[0] != (TPINGREQ<<4) || data[1] != 0 {
 		return nil, ErrProtocolViolation
 	}
-	return &Pingreq{packetBytes: data[0:2]}, nil
+	return &Pingreq{endecBytes: data[0:2]}, nil
 }
 
 // MakePingreq create a mqtt pingreq packet
 func MakePingreq() Pingreq {
-	pb := make([]byte, 2)
-	fill(pb, PINGREQ<<4, uint32(0))
-	return Pingreq{packetBytes: pb}
+	p := Pingreq{endecBytes: make([]byte, 2)}
+	p.fill(0, TPINGREQ<<4, uint32(0))
+	return p
 }

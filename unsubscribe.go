@@ -14,83 +14,65 @@
 
 package mqpp
 
-import "encoding/binary"
-
 // Unsubscribe mqtt unsubscribe from topics, structure:
 // fixed header:
 // variable header: Packet Identifier
 // payload: Topic Filters
 type Unsubscribe struct {
-	packetBytes
-	remainingLengthBytes int
-	topicFiltersBytes    []int
+	endecBytes
+	packetIDPos     int
+	topicFilterPoss []int
 }
 
 func newUnsubscribe(data []byte) (*Unsubscribe, error) {
-	if data[0] != (UNSUBSCRIBE<<4 | 0x02) {
-		return nil, ErrProtocolViolation
-	}
-	offset := 1
-	remlen, remlenLen := decRemLen(data[offset:])
-	if remlenLen <= 0 {
-		return nil, ErrMalformedRemLen
-	}
-	offset += remlenLen
-	packetLen := offset + int(remlen)
-	if len(data) < packetLen {
+	if data[0] != (TUNSUBSCRIBE<<4 | 0x02) {
 		return nil, ErrProtocolViolation
 	}
 
-	offset += 2 //variable header
-
-	filterLens := []int{}
-	for offset < 1+remlenLen+int(remlen) {
-		filterLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
-		offset += (2 + filterLen)
-		filterLens = append(filterLens, filterLen)
+	p := &Unsubscribe{endecBytes: data}
+	// 1) packet type
+	remlen, offset := p.remlen(1) // 2) remaining length
+	p.packetIDPos = offset
+	pktLen := offset + int(remlen)
+	_, offset = p.uint16(p.packetIDPos) // 3) packet identifier
+	p.topicFilterPoss = []int{}
+	for offset < pktLen {
+		p.topicFilterPoss = append(p.topicFilterPoss, offset)
+		_, offset = p.string(offset) // 4~N) topic filter
 	}
 
-	return &Unsubscribe{
-		packetBytes:          data[0:packetLen],
-		remainingLengthBytes: remlenLen,
-		topicFiltersBytes:    filterLens,
-	}, nil
+	return p, nil
 }
 
 // MakeUnsubscribe create a mqtt unsubscribe packet
 func MakeUnsubscribe(packetIdentifier uint16, payload []string) Unsubscribe {
-	remlen := 0
-	remlen += 2
-	filterLens := []int{}
-	for _, filter := range payload {
-		remlen += (2 + len(filter))
-		filterLens = append(filterLens, len(filter))
+	p := Unsubscribe{}
+	remlen := p.calc(packetIdentifier, payload)
+	pktLen := 1 + p.calc(uint32(remlen)) + remlen
+
+	p.endecBytes = make([]byte, pktLen)
+	p.packetIDPos = p.fill(0, TUNSUBSCRIBE<<4|0x02, uint32(remlen))
+	offset := p.fill(p.packetIDPos, packetIdentifier)
+	p.topicFilterPoss = make([]int, len(payload))
+	for i, filter := range payload {
+		p.topicFilterPoss[i] = offset
+		offset = p.fill(offset, filter)
 	}
-	pb := make([]byte, 1+lenRemLen(uint32(remlen))+remlen)
-	offset := fill(pb, UNSUBSCRIBE<<4|0x02, uint32(remlen), packetIdentifier)
-	for _, filter := range payload {
-		offset += fill(pb[offset:], filter)
-	}
-	return Unsubscribe{
-		packetBytes:          pb,
-		remainingLengthBytes: lenRemLen(uint32(remlen)),
-		topicFiltersBytes:    filterLens,
-	}
+
+	return p
 }
 
 // PacketIdentifier return packet id
 func (u *Unsubscribe) PacketIdentifier() uint16 {
-	fixedHeaderLen := 1 + u.remainingLengthBytes
-	return binary.BigEndian.Uint16(u.packetBytes[fixedHeaderLen : fixedHeaderLen+2])
+	pid, _ := u.uint16(u.packetIDPos)
+	return pid
 }
 
 // Payload return topic filters
 func (u *Unsubscribe) Payload() []string {
-	filters := make([]string, len(u.topicFiltersBytes))
-	offset := 1 + u.remainingLengthBytes + 2
-	for i, l := range u.topicFiltersBytes {
-		filters[i] = string(u.packetBytes[offset+2 : offset+2+l])
-		offset += (2 + l)
+	filters := make([]string, len(u.topicFilterPoss))
+	for i, l := range u.topicFilterPoss {
+		filters[i], _ = u.string(l)
 	}
 	return filters
 }

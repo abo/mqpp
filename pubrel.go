@@ -14,30 +14,29 @@
 
 package mqpp
 
-import "encoding/binary"
-
 // Pubrel mqtt publish release(qos 2 publish received, part 2), structure:
 // fixed header
 // variable header: Packet Identifier
 type Pubrel struct {
-	packetBytes
+	endecBytes
 }
 
 func newPubrel(data []byte) (*Pubrel, error) {
-	if len(data) < 4 || data[0] != (PUBREL<<4|0x02) || data[1] != 2 {
+	if len(data) < 4 || data[0] != (TPUBREL<<4|0x02) || data[1] != 2 {
 		return nil, ErrProtocolViolation
 	}
-	return &Pubrel{packetBytes: data[0:4]}, nil
+	return &Pubrel{endecBytes: data[0:4]}, nil
 }
 
 // MakePubrel create a mqtt pubrel packet
 func MakePubrel(packetIdentifier uint16) Pubrel {
-	pb := make([]byte, 4)
-	fill(pb, PUBREL<<4|0x02, uint32(2), packetIdentifier)
-	return Pubrel{packetBytes: pb}
+	p := Pubrel{endecBytes: make([]byte, 4)}
+	p.fill(0, TPUBREL<<4|0x02, uint32(2), packetIdentifier)
+	return p
 }
 
 // PacketIdentifier return packet id
 func (p *Pubrel) PacketIdentifier() uint16 {
-	return binary.BigEndian.Uint16(p.packetBytes[2:])
+	pid, _ := p.uint16(2)
+	return pid
 }

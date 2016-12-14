@@ -10,16 +10,16 @@ Usage
 
     func main() {
         ...
-        scanner := mqpp.NewScanner(r)
-        for scanner.Scan() {
-            p, err := scanner.Packet()
+        splitter := mqpp.NewSplitter(r)
+        for splitter.Scan() {
+            p, err := splitter.Packet()
             if err != nil {
                 
             }
             ....
         }
 
-        if err := scanner.Err(); err != nil {
+        if err := splitter.Err(); err != nil {
             
         }
     }

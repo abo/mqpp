@@ -14,110 +14,99 @@
 
 package mqpp
 
-import "encoding/binary"
-
 // Publish mqtt publish message, structure:
 // fixed header
 // variable header: Topic Name, Packet Identifier
 // payload: content
 type Publish struct {
-	packetBytes
-	remainingLengthBytes int
-	topicNameBytes       int
+	endecBytes
+	topicNamePos int
+	packetIDPos  int
+	payloadPos   int
 }
 
 func newPublish(data []byte) (*Publish, error) {
-	if len(data) < 1 || data[0]>>4 != PUBLISH {
+	if len(data) < 1 || data[0]>>4 != TPUBLISH {
 		return nil, ErrProtocolViolation
 	}
-	offset := 1
-	remlen, remlenLen := decRemLen(data[offset:])
-	if remlenLen <= 0 {
+	p := &Publish{endecBytes: data}
+	fixedHeader, offset := p.byte(0)
+	qos := fixedHeader << 5 >> 6
+	remlen, offset := p.remlen(offset)
+	if offset <= 1 {
 		return nil, ErrMalformedRemLen
 	}
-	offset += remlenLen
-
-	packetLen := offset + int(remlen)
-	if len(data) < packetLen {
+	pktLen := offset + int(remlen)
+	if len(data) < pktLen {
 		return nil, ErrProtocolViolation
 	}
+	p.topicNamePos = offset
+	_, offset = p.string(p.topicNamePos)
+	if qos > QosAtMostOnce {
+		p.packetIDPos = offset
+		_, offset = p.uint16(offset)
+	}
+	p.payloadPos = offset
 
-	topicLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
-	// offset += (2 + topicLen)
-
-	// pid := int(binary.BigEndian.Uint16(data[offset : offset+2]))
-	return &Publish{
-		packetBytes:          data[0:packetLen],
-		remainingLengthBytes: remlenLen,
-		topicNameBytes:       topicLen,
-	}, nil
+	return p, nil
 }
 
 // MakePublish create a mqtt publish packet
 func MakePublish(dup bool, qos byte, retain bool, topicName string, packetIdentifier uint16, payload []byte) Publish {
-	topicLen := len(topicName)
-	remlen := (2 + topicLen) + 2 + len(payload)
-	remlenLen := lenRemLen(uint32(remlen))
-
-	pb := make([]byte, 1+remlenLen+remlen)
-	offset := fill(pb, (PUBLISH<<4)|set(3, dup)|(qos<<1)|set(0, retain))
-	offset += fill(pb[offset:], uint32(remlen), topicName)
+	p := Publish{}
+	remlen := p.calc(topicName, payload)
 	if qos > QosAtMostOnce {
-		offset += fill(pb[offset:], packetIdentifier)
+		remlen += p.calc(packetIdentifier)
 	}
-	offset += fill(pb[offset:], payload)
+	pktLen := 1 + p.calc(uint32(remlen)) + remlen
 
-	return Publish{
-		packetBytes:          pb,
-		remainingLengthBytes: remlenLen,
-		topicNameBytes:       topicLen,
+	p.endecBytes = make([]byte, pktLen)
+	offset := p.fill(0, (TPUBLISH<<4)|(qos<<1))
+	p.set(0, 3, dup).set(0, 0, retain)
+	p.topicNamePos = p.fill(offset, uint32(remlen))
+	offset = p.fill(p.topicNamePos, topicName)
+	if qos > QosAtMostOnce {
+		p.packetIDPos = offset
+		offset = p.fill(p.packetIDPos, packetIdentifier)
 	}
+	p.payloadPos = offset
+	p.fill(p.payloadPos, payload)
+	return p
 }
 
 // Dup return is dup
 func (p *Publish) Dup() bool {
-	return bit(p.packetBytes[0], 3)
+	return p.bit(0, 3)
 }
 
 // QoS return qos
 func (p *Publish) QoS() byte {
-	return p.packetBytes[0] << 5 >> 6
+	qos, _ := p.byte(0)
+	return qos << 5 >> 6
 }
 
 // Retain return is retain set
 func (p *Publish) Retain() bool {
-	return bit(p.packetBytes[0], 0)
+	return p.bit(0, 0)
 }
 
 // TopicName return topic name
 func (p *Publish) TopicName() string {
-	return string(p.variableHeader()[2 : 2+p.topicNameBytes])
+	topic, _ := p.string(p.topicNamePos)
+	return topic
 }
 
 // PacketIdentifier return packet id if qos > 0, or zero when qos = 0
 func (p *Publish) PacketIdentifier() uint16 {
 	if p.QoS() > QosAtMostOnce {
-		return binary.BigEndian.Uint16(p.variableHeader()[2+p.topicNameBytes:])
+		pid, _ := p.uint16(p.packetIDPos)
+		return pid
 	}
 
 	return 0
 }
 
-func (p *Publish) variableHeader() []byte {
-	fixedHeaderLen := 1 + p.remainingLengthBytes
-	variableHeaderLen := 2 + p.topicNameBytes
-	if p.QoS() > QosAtMostOnce {
-		variableHeaderLen += 2
-	}
-	return p.packetBytes[fixedHeaderLen : fixedHeaderLen+variableHeaderLen]
-}
-
 // Payload return publish content
 func (p *Publish) Payload() []byte {
-	fixedHeaderLen := 1 + p.remainingLengthBytes
-	variableHeaderLen := 2 + p.topicNameBytes
-	if p.QoS() > QosAtMostOnce {
-		variableHeaderLen += 2
-	}
-	return p.packetBytes[fixedHeaderLen+variableHeaderLen:]
+	return p.bytes(p.payloadPos)
 }
